@@ -7,3 +7,7 @@ cfg/match_history.toml
 test.py
 /debug_frames
 venv/
+/build
+/dist
+main.spec
+start.bat
