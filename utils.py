@@ -91,10 +91,6 @@ def find_template_center(main_img, template, threshold=0.8):
         center_x = max_loc[0] + w // 2
         center_y = max_loc[1] + h // 2
 
-        top_left = max_loc
-        bottom_right = (top_left[0] + w, top_left[1] + h)
-        cv2.rectangle(main_image_cv, top_left, bottom_right, 255, 2)  # White rectangle with thickness 2
-
         return center_x, center_y
     else:
         return False

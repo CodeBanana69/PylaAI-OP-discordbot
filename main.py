@@ -56,8 +56,7 @@ def pyla_main(data):
         @staticmethod
         def load_models():
             folder_path = "./models/"
-            model_names = ['mainInGameModel.onnx','startingScreenModel.onnx',
-                           'tileDetector.onnx']
+            model_names = ['mainInGameModel.onnx', 'tileDetector.onnx']
             loaded_models = []
 
             for name in model_names:
@@ -66,11 +65,17 @@ def pyla_main(data):
 
         def restart_brawl_stars(self):
             loop = asyncio.new_event_loop()
-            screenshot = self.window_controller.screenshot()
-            loop.run_until_complete(async_notify_user("bot_is_stuck", screenshot))
-            loop.close()
-            print("Bot got stuck. User notified. Pause until closed.")
-            time.sleep(99 * 999)
+            asyncio.set_event_loop(loop)
+            try:
+                screenshot = self.window_controller.screenshot()
+                loop.run_until_complete(async_notify_user("bot_is_stuck", screenshot))
+            finally:
+                loop.close()
+            print("Bot got stuck. User notified. Shutting down.")
+            self.window_controller.keys_up(list("wasd"))
+            self.window_controller.close()
+            import sys
+            sys.exit(1)
 
         def manage_time_tasks(self, frame):
             if self.Time_management.state_check():
@@ -119,7 +124,14 @@ def pyla_main(data):
 
                 frame = self.window_controller.screenshot()
 
-                self.manage_time_tasks(frame)  # Replace with your actual method
+                _, last_ft = self.window_controller.get_latest_frame()
+                if last_ft > 0 and (time.time() - last_ft) > self.window_controller.FRAME_STALE_TIMEOUT:
+                    self.Play.window_controller.keys_up(list("wasd"))
+                    print("Stale frame detected -- pausing actions until feed resumes")
+                    time.sleep(1)
+                    continue
+
+                self.manage_time_tasks(frame)
 
 
                 brawler = self.Stage_manager.brawlers_pick_data[0]['brawler']

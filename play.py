@@ -55,7 +55,7 @@ class Movement:
 
     @staticmethod
     def is_there_enemy(enemy_data):
-        if enemy_data is None or enemy_data[0] is None:
+        if not enemy_data:
             return False
         return True
 
@@ -138,14 +138,13 @@ class Movement:
 
 class Play(Movement):
 
-    def __init__(self, main_info_model, starting_screen_model, tile_detector_model, window_controller):
+    def __init__(self, main_info_model, tile_detector_model, window_controller):
         super().__init__(window_controller)
 
         bot_config = load_toml_as_dict("cfg/bot_config.toml")
         time_config = load_toml_as_dict("cfg/time_tresholds.toml")
 
         self.Detect_main_info = Detect(main_info_model, classes=['enemy', 'teammate', 'player'])
-        self.Detect_starting_screen = Detect(starting_screen_model)
         self.tile_detector_model_classes = bot_config["wall_model_classes"]
         self.Detect_tile_detector = Detect(
             tile_detector_model,
@@ -360,7 +359,7 @@ class Play(Movement):
 
     def check_if_super_ready(self, frame):
         screenshot = frame.crop((1460 * self.window_controller.width_ratio, 830 * self.window_controller.height_ratio, 1560 * self.window_controller.width_ratio, 930 * self.window_controller.height_ratio))
-        yellow_pixels = count_hsv_pixels(screenshot, (19, 190, 249), (24, 240, 255))
+        yellow_pixels = count_hsv_pixels(screenshot, (17, 170, 200), (27, 255, 255))
         if yellow_pixels > self.super_pixels_minimum:
             return True
         return False

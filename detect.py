@@ -55,7 +55,7 @@ class Detect:
         resized_img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
 
         # Create a new image and pad it
-        padded_img = np.full((self.input_size[1], self.input_size[0], 3), 128, dtype=np.uint8)
+        padded_img = np.full((self.input_size[0], self.input_size[1], 3), 128, dtype=np.uint8)
         padded_img[:new_h, :new_w, :] = resized_img
 
         # Convert BGR to RGB
