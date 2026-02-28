@@ -352,7 +352,7 @@ class Play(Movement):
         purple_pixels = count_hsv_pixels(screenshot, (137, 158, 159), (179, 255, 255))
         if debug:
             print("hypercharge purple pixels:", purple_pixels, "(if > ", self.hypercharge_pixels_minimum, " then hypercharge is ready)")
-            screenshot.save(f"hypercharge_debug_{int(time.time())}.png")
+            screenshot.save(f"debug_frames/hypercharge_debug_{int(time.time())}.png")
         if purple_pixels > self.hypercharge_pixels_minimum:
             return True
         return False
@@ -362,7 +362,7 @@ class Play(Movement):
         green_pixels = count_hsv_pixels(screenshot, (57, 219, 165), (62, 255, 255))
         if debug:
             print("gadget green pixels:", green_pixels, "(if > ", self.gadget_pixels_minimum, " then gadget is ready)")
-            screenshot.save(f"gadget_debug_{int(time.time())}.png")
+            screenshot.save(f"debug_frames/gadget_debug_{int(time.time())}.png")
         if green_pixels > self.gadget_pixels_minimum:
             return True
         return False
@@ -370,8 +370,9 @@ class Play(Movement):
     def check_if_super_ready(self, frame):
         screenshot = frame.crop((super_crop_area[0] * self.window_controller.width_ratio, super_crop_area[1] * self.window_controller.height_ratio, super_crop_area[2] * self.window_controller.width_ratio, super_crop_area[3] * self.window_controller.height_ratio))
         yellow_pixels = count_hsv_pixels(screenshot, (19, 190, 232), (24, 240, 255))
-        if debug: print("super yellow pixels:", yellow_pixels, "(if > ", self.super_pixels_minimum, " then super is ready)")
-        screenshot.save(f"super_debug_{int(time.time())}.png")
+        if debug:
+            print("super yellow pixels:", yellow_pixels, "(if > ", self.super_pixels_minimum, " then super is ready)")
+            screenshot.save(f"debug_frames/super_debug_{int(time.time())}.png")
         if yellow_pixels > self.super_pixels_minimum:
             return True
         return False
