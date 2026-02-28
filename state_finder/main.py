@@ -18,6 +18,7 @@ for file in os.listdir("./state_finder/images_to_detect"):
         images_with_star_drop.append(file)
 # path = r"./images_to_detect/"
 region_data = load_toml_as_dict("./cfg/lobby_config.toml")['template_matching']
+super_debug = load_toml_as_dict("./cfg/lobby_config.toml")['super_debug'] == "yes"
 
 def is_template_in_region(image, template_path, region):
     current_height, current_width = image.shape[:2]
@@ -142,6 +143,7 @@ def is_in_star_drop(image):
     return False
 
 def get_state(screenshot):
+    if super_debug: screenshot.save(f"./debug_frames/state_screenshot_{len(os.listdir('./debug_frames'))}.png")
     screenshot = np.array(screenshot)
     screenshot_bgr = cv2.cvtColor(screenshot, cv2.COLOR_RGB2BGR)
     state = get_in_game_state(screenshot_bgr)

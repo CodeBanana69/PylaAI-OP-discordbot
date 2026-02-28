@@ -10,6 +10,10 @@ from detect import Detect
 from utils import load_toml_as_dict, count_hsv_pixels, load_brawlers_info
 
 brawl_stars_width, brawl_stars_height = 1920, 1080
+debug = load_toml_as_dict("cfg/general_config.toml")['super_debug'] == "yes"
+super_crop_area = load_toml_as_dict("./cfg/lobby_config.toml")['pixel_counter_crop_area']['super']
+gadget_crop_area = load_toml_as_dict("./cfg/lobby_config.toml")['pixel_counter_crop_area']['gadget']
+hypercharge_crop_area = load_toml_as_dict("./cfg/lobby_config.toml")['pixel_counter_crop_area']['hypercharge']
 
 class Movement:
 
@@ -344,22 +348,30 @@ class Play(Movement):
         return movement
 
     def check_if_hypercharge_ready(self, frame):
-        screenshot = frame.crop((1350 * self.window_controller.width_ratio, 940 * self.window_controller.height_ratio, 1450 * self.window_controller.width_ratio, 1050 * self.window_controller.height_ratio))
+        screenshot = frame.crop((hypercharge_crop_area[0] * self.window_controller.width_ratio, hypercharge_crop_area[1] * self.window_controller.height_ratio, hypercharge_crop_area[2] * self.window_controller.width_ratio, hypercharge_crop_area[3] * self.window_controller.height_ratio))
         purple_pixels = count_hsv_pixels(screenshot, (137, 158, 159), (179, 255, 255))
+        if debug:
+            print("hypercharge purple pixels:", purple_pixels, "(if > ", self.hypercharge_pixels_minimum, " then hypercharge is ready)")
+            screenshot.save(f"hypercharge_debug_{int(time.time())}.png")
         if purple_pixels > self.hypercharge_pixels_minimum:
             return True
         return False
 
     def check_if_gadget_ready(self, frame):
-        screenshot = frame.crop((1580 * self.window_controller.width_ratio, 930 * self.window_controller.height_ratio, 1700 * self.window_controller.width_ratio, 1050 * self.window_controller.height_ratio))
+        screenshot = frame.crop((gadget_crop_area[0] * self.window_controller.width_ratio, gadget_crop_area[1] * self.window_controller.height_ratio, gadget_crop_area[2] * self.window_controller.width_ratio, gadget_crop_area[3] * self.window_controller.height_ratio))
         green_pixels = count_hsv_pixels(screenshot, (57, 219, 165), (62, 255, 255))
+        if debug:
+            print("gadget green pixels:", green_pixels, "(if > ", self.gadget_pixels_minimum, " then gadget is ready)")
+            screenshot.save(f"gadget_debug_{int(time.time())}.png")
         if green_pixels > self.gadget_pixels_minimum:
             return True
         return False
 
     def check_if_super_ready(self, frame):
-        screenshot = frame.crop((1460 * self.window_controller.width_ratio, 830 * self.window_controller.height_ratio, 1560 * self.window_controller.width_ratio, 930 * self.window_controller.height_ratio))
-        yellow_pixels = count_hsv_pixels(screenshot, (17, 170, 200), (27, 255, 255))
+        screenshot = frame.crop((super_crop_area[0] * self.window_controller.width_ratio, super_crop_area[1] * self.window_controller.height_ratio, super_crop_area[2] * self.window_controller.width_ratio, super_crop_area[3] * self.window_controller.height_ratio))
+        yellow_pixels = count_hsv_pixels(screenshot, (19, 190, 232), (24, 240, 255))
+        if debug: print("super yellow pixels:", yellow_pixels, "(if > ", self.super_pixels_minimum, " then super is ready)")
+        screenshot.save(f"super_debug_{int(time.time())}.png")
         if yellow_pixels > self.super_pixels_minimum:
             return True
         return False
@@ -404,11 +416,13 @@ class Play(Movement):
         safe_range, attack_range, super_range = self.get_brawler_range(brawler)
 
         player_pos = self.get_player_pos(player_data)
+        if debug: print("found player pos:", player_pos)
         if not self.is_there_enemy(enemy_data):
             return self.no_enemy_movement(player_data, walls)
         enemy_coords, enemy_distance = self.find_closest_enemy(enemy_data, player_pos, walls, "attack")
         if enemy_coords is None:
             return self.no_enemy_movement(player_data, walls)
+        if debug: print("found enemy pos:", enemy_coords)
         direction_x = enemy_coords[0] - player_pos[0]
         direction_y = enemy_coords[1] - player_pos[1]
 

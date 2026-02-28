@@ -36,7 +36,7 @@ class LobbyAutomation:
             if brawler_menu_btn_coords:
                 found = True
             else:
-                if debug: print("Brawler menu button not found, retrying...")
+                print("Brawler menu button not found, retrying...")
                 brawler_menu_treshold -= 0.1
                 time.sleep(1)
             if not found and brawler_menu_treshold < 0.5:
@@ -65,14 +65,14 @@ class LobbyAutomation:
                 print("All detected text while looking for brawler name:", reworked_results.keys())
                 print()
             if brawler in reworked_results.keys():
-                if debug: print("Found brawler ", brawler)
+                print("Found brawler ", brawler, "clicking on its icon at ", int(x * 1.5385), int(y * 1.5385))
                 x, y = reworked_results[brawler]['center']
                 self.window_controller.click(int(x * 1.5385), int(y * 1.5385))
                 time.sleep(1)
                 select_x, select_y = self.coords_cfg['lobby']['select_btn'][0], self.coords_cfg['lobby']['select_btn'][1]
                 self.window_controller.click(select_x, select_y, already_include_ratio=False)
                 time.sleep(0.5)
-                if debug: print("Selected brawler ", brawler)
+                print("Selected brawler ", brawler)
                 found_brawler = True
                 break
             if c == 0:

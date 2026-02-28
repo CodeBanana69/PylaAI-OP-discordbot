@@ -15,7 +15,6 @@ from utils import find_template_center, extract_text_and_positions, load_toml_as
     save_brawler_data
 
 user_id = load_toml_as_dict("cfg/general_config.toml")['discord_id']
-debug = load_toml_as_dict("cfg/general_config.toml")['super_debug'] == "yes"
 user_webhook = load_toml_as_dict("cfg/general_config.toml")['personal_webhook']
 
 
@@ -142,7 +141,7 @@ class StageManager:
             self.Trophy_observer.win_streak = self.brawlers_pick_data[0]['win_streak']
             next_brawler_name = self.brawlers_pick_data[0]['brawler']
             if self.brawlers_pick_data[0]["automatically_pick"]:
-                if debug: print("Picking next automatically picked brawler")
+                print("Picking next automatically submitted brawler")
                 screenshot = self.window_controller.screenshot()
                 current_state = get_state(screenshot)
                 if current_state != "lobby":
@@ -152,7 +151,7 @@ class StageManager:
                 attempts = 0
                 while current_state != "lobby" and attempts < max_attempts:
                     self.window_controller.press_key("Q")
-                    if debug: print("Pressed Q to return to lobby")
+                    print("Pressed Q to return to lobby")
                     time.sleep(1)
                     screenshot = self.window_controller.screenshot()
                     current_state = get_state(screenshot)
@@ -234,14 +233,14 @@ class StageManager:
                         self.window_controller.close()
                         sys.exit(0)
             self.window_controller.press_key("Q")
-            if debug: print("Game has ended, pressing Q")
+            print("Game has ended, pressing Q")
             time.sleep(3)
             screenshot = self.window_controller.screenshot()
             current_state = get_state(screenshot)
             end_attempts += 1
         if end_attempts >= max_end_attempts:
             print("End game screen stuck for too long, forcing continue")
-        if debug: print("Game has ended", current_state)
+        print("Game has ended", current_state)
 
     def quit_shop(self):
         self.window_controller.click(100*self.window_controller.width_ratio, 60*self.window_controller.height_ratio)

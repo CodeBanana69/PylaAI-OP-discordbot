@@ -9,7 +9,6 @@ from customtkinter import CTkImage
 from utils import load_toml_as_dict, update_toml_file, save_brawler_icon, get_dpi_scale
 from tkinter import filedialog
 
-debug = load_toml_as_dict("cfg/general_config.toml")['super_debug'] == "yes"
 orig_screen_width, orig_screen_height = 1920, 1080
 width, height = pyautogui.size()
 width_ratio = width / orig_screen_width
@@ -205,7 +204,7 @@ class SelectBrawler:
             self.brawlers_data = [item for item in self.brawlers_data if item["brawler"] != data["brawler"]]
             self.brawlers_data.append(data)
 
-            if debug: print("Selected Brawler Data :", self.brawlers_data)
+            print("Selected Brawler Data :", self.brawlers_data)
             top.destroy()
 
         submit_button = ctk.CTkButton(

@@ -17,8 +17,6 @@ from window_controller import WindowController
 
 pyla_version = load_toml_as_dict("./cfg/general_config.toml")['pyla_version']
 
-debug = load_toml_as_dict("cfg/general_config.toml")['super_debug'] == "yes"
-
 
 def pyla_main(data):
     class Main:
@@ -31,7 +29,7 @@ def pyla_main(data):
             self.Stage_manager = StageManager(data, self.lobby_automator, self.window_controller)
             self.states_requiring_data = ["play_store", "lobby"]
             if data[0]['automatically_pick']:
-                if debug: print("Picking brawler automatically")
+                print("Picking brawler automatically")
                 self.lobby_automator.select_brawler(data[0]['brawler'])
             self.Play.current_brawler = data[0]['brawler']
             self.no_detections_action_threshold = 60 * 8

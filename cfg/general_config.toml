@@ -1,6 +1,6 @@
 personal_webhook = ""
 discord_id = ""
-super_debug = "yes"
+super_debug = "no"
 cpu_or_gpu = "auto"
 max_ips = "auto"
 pyla_version = "0.5.8"
