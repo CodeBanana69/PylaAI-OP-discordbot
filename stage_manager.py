@@ -56,7 +56,8 @@ class StageManager:
             'end': self.end_game,
             'lobby': self.start_game,
             'play_store': self.click_brawl_stars,
-            'star_drop': self.click_star_drop
+            'star_drop': self.click_star_drop,
+            'trophy_reward': lambda: self.window_controller.press_key("Q")
         }
         self.Lobby_automation = lobby_automator
         self.lobby_config = load_toml_as_dict("./cfg/lobby_config.toml")

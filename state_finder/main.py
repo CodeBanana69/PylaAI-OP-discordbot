@@ -1,6 +1,6 @@
 import os
 import sys
-from utils import reader
+from utils import reader, extract_text_and_positions
 import cv2
 import numpy as np
 from difflib import SequenceMatcher
@@ -18,8 +18,11 @@ for file in os.listdir("./state_finder/images_to_detect"):
         images_with_star_drop.append(file)
 # path = r"./images_to_detect/"
 region_data = load_toml_as_dict("./cfg/lobby_config.toml")['template_matching']
-super_debug = load_toml_as_dict("./cfg/lobby_config.toml")['super_debug'] == "yes"
-
+super_debug = load_toml_as_dict("./cfg/general_config.toml")['super_debug'] == "yes"
+if super_debug:
+    debug_folder = "./debug_frames/"
+    if not os.path.exists(debug_folder):
+        os.makedirs(debug_folder)
 def is_template_in_region(image, template_path, region):
     current_height, current_width = image.shape[:2]
     orig_x, orig_y, orig_width, orig_height = region
@@ -95,7 +98,7 @@ def get_in_game_state(image):
     if is_in_brawler_selection(image):
         return "brawler_selection"
 
-    if count_hsv_pixels(Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB)), (0, 0, 240), (180, 20, 255)) > 200000:
+    if count_hsv_pixels(Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB)), (0, 0, 240), (180, 20, 255)) > 300000:
         return "play_store"
 
     if is_in_brawl_pass(image) or is_in_star_road(image):
@@ -103,6 +106,9 @@ def get_in_game_state(image):
 
     if is_in_star_drop(image):
         return "star_drop"
+
+    if is_in_trophy_reward(image):
+        return "trophy_reward"
 
     return "match"
 
@@ -125,6 +131,16 @@ def is_in_lobby(image) -> bool:
 
 def is_in_end_of_a_match(image):
     return find_game_result(image)
+
+
+
+def is_in_trophy_reward(image):
+    image = np.array(image)
+    starting_x = int(image.shape[1] * 0.75)
+    starting_y = int(image.shape[0] * 0.75)
+    image = image[starting_y:, starting_x:]
+    all_text = (" ".join(extract_text_and_positions(image).keys())).lower().replace("'", "")
+    return "go" in all_text
 
 
 def is_in_brawl_pass(image):
