@@ -582,6 +582,17 @@ class Hub:
         container.grid_columnconfigure(0, weight=1)
         container.grid_columnconfigure(1, weight=1)
 
+        self._add_version_label(frame)
+
+    def _add_version_label(self, frame):
+        version_label = ctk.CTkLabel(
+            frame,
+            text="SD-OP v1.1",
+            font=("Arial", S(14), "bold"),
+            text_color="#888888"
+        )
+        version_label.place(relx=1.0, rely=1.0, anchor="se", x=-S(10), y=-S(10))
+
     # ---------------------------------------------------------------------------------------------
     #  Additional Settings Tab
     # ---------------------------------------------------------------------------------------------
@@ -836,6 +847,8 @@ class Hub:
         container.grid_columnconfigure(0, weight=1)
         container.grid_columnconfigure(1, weight=1)
 
+        self._add_version_label(frame)
+
     # ---------------------------------------------------------------------------------------------
     #  Timers Tab
     # ---------------------------------------------------------------------------------------------
@@ -962,6 +975,8 @@ class Hub:
         container.grid_columnconfigure(0, weight=1)
         container.grid_columnconfigure(1, weight=1)
 
+        self._add_version_label(frame)
+
     # ---------------------------------------------------------------------------------------------
     #  Match History Tab
     # ---------------------------------------------------------------------------------------------
@@ -1045,6 +1060,8 @@ class Hub:
             if col_idx >= max_cols:
                 col_idx = 0
                 row_idx += 1
+
+        self._add_version_label(frame)
 
     # ---------------------------------------------------------------------------------------------
     #  On Start => close window + callback
