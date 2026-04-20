@@ -1,7 +1,14 @@
 import os
+import time
+from datetime import datetime
 
 import requests
 from utils import load_toml_as_dict, save_dict_as_toml, api_base_url
+
+TROPHY_LOG_DIR = "logs"
+TROPHY_LOG_FILE = "trophies.log"
+TROPHY_LOG_MAX_LINES = 1000
+MILESTONE_STEP = 100
 class TrophyObserver:
 
     def __init__(self, brawler_list):
@@ -12,7 +19,7 @@ class TrophyObserver:
         self.match_history['total'] = {"defeat": 0, "victory": 0, "draw": 0}
         self.sent_match_history = {brawler: {"defeat": self.match_history[brawler]["defeat"],
                                              "victory": self.match_history[brawler]["victory"],
-                                             "draw": 0}
+                                             "draw": self.match_history[brawler]["draw"]}
                                    for brawler in brawler_list}
         self.win_streak = 0
         self.match_counter = 0  # New counter for the number of matches
@@ -44,6 +51,21 @@ class TrophyObserver:
         ]
         self.crop_region = load_toml_as_dict("./cfg/lobby_config.toml")['lobby']['trophy_observer']
         self.trophies_multiplier = int(load_toml_as_dict("./cfg/general_config.toml")["trophies_multiplier"])
+
+        # Per-brawler milestone tracking for the trophies log.
+        #   _milestone_anchor_trophies[brawler] = trophies value that the
+        #     current summary stretch is measured FROM. On first match of a
+        #     session it's the brawler's actual starting trophies. After a
+        #     milestone is crossed upward it becomes that milestone. After a
+        #     downward move it becomes the lowest trophies seen in this
+        #     stretch.
+        #   _milestone_anchor_time[brawler] = monotonic timestamp matching
+        #     when anchor_trophies was last observed. Resets together with
+        #     anchor_trophies.
+        self._milestone_anchor_trophies = {}
+        self._milestone_anchor_time = {}
+        os.makedirs(TROPHY_LOG_DIR, exist_ok=True)
+        self._trophy_log_path = os.path.join(TROPHY_LOG_DIR, TROPHY_LOG_FILE)
 
     def win_streak_gain(self):
         return min(self.win_streak - 1, 10) if self.current_trophies < 2000 else 0
@@ -92,10 +114,81 @@ class TrophyObserver:
     def save_history(self):
         save_dict_as_toml(self.match_history, self.history_file)
 
+    def _write_trophy_log(self, line):
+        try:
+            with open(self._trophy_log_path, "a", encoding="utf-8") as f:
+                f.write(line + "\n")
+            self._trim_trophy_log()
+        except OSError as e:
+            print(f"Failed to write trophy log: {e}")
+
+    def _trim_trophy_log(self):
+        try:
+            with open(self._trophy_log_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            if len(lines) <= TROPHY_LOG_MAX_LINES:
+                return
+            with open(self._trophy_log_path, "w", encoding="utf-8") as f:
+                f.writelines(lines[-TROPHY_LOG_MAX_LINES:])
+        except OSError as e:
+            print(f"Failed to trim trophy log: {e}")
+
+    @staticmethod
+    def _format_duration(seconds):
+        seconds = int(seconds)
+        h, rem = divmod(seconds, 3600)
+        m, s = divmod(rem, 60)
+        if h:
+            return f"{h}h {m}m {s}s"
+        if m:
+            return f"{m}m {s}s"
+        return f"{s}s"
+
+    def _log_match(self, brawler, game_result, old, new):
+        delta = new - old
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self._write_trophy_log(
+            f"[{ts}] brawler={brawler} result={game_result} {old} -> {new} ({delta:+d})"
+        )
+
+    def _update_milestones(self, brawler, old, new):
+        """Track every MILESTONE_STEP-trophy boundary the brawler crosses.
+
+        Each milestone is summarized exactly once per session — the first
+        time it's reached. After that the anchor is frozen at (milestone,
+        crossing_time) and never rewinds on dips below it. The next summary
+        (for the next milestone) is therefore measured from that original
+        crossing, regardless of intermediate drops.
+        """
+        now = time.monotonic()
+        step = MILESTONE_STEP
+
+        if brawler not in self._milestone_anchor_time:
+            self._milestone_anchor_trophies[brawler] = old
+            self._milestone_anchor_time[brawler] = now
+
+        anchor_trophies = self._milestone_anchor_trophies[brawler]
+
+        # Upward: emit a summary for every milestone strictly above the anchor
+        # that `new` has reached. The first one uses the actual anchor value
+        # (e.g. 777 -> 800); subsequent ones use the previous milestone.
+        next_milestone = ((anchor_trophies // step) + 1) * step
+        while new >= next_milestone:
+            elapsed = now - self._milestone_anchor_time[brawler]
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self._write_trophy_log(
+                f"[{ts}] SUMMARY brawler={brawler} {anchor_trophies} -> {next_milestone} "
+                f"time={self._format_duration(elapsed)}"
+            )
+            anchor_trophies = next_milestone
+            self._milestone_anchor_trophies[brawler] = anchor_trophies
+            self._milestone_anchor_time[brawler] = now
+            next_milestone += step
+
     # Map showdown places to match_history victory/defeat buckets so the
     # existing history/API reporting keeps working unchanged.
     _showdown_place_index = {"1st": 0, "2nd": 1, "3rd": 2, "4th": 3}
-    _showdown_place_to_bucket = {"1st": "victory", "2nd": "victory", "3rd": "defeat", "4th": "defeat"}
+    _showdown_place_to_bucket = {"1st": "victory", "2nd": "victory", "3rd": "draw", "4th": "defeat"}
 
     def add_trophies(self, game_result, current_brawler):
         if current_brawler not in self.sent_match_history:
@@ -150,6 +243,8 @@ class TrophyObserver:
         self.apply_trophy_floor(old)
         print(f"Trophies : {old} -> {self.current_trophies}")
         print("Current wins:", self.current_wins)
+        self._log_match(current_brawler, game_result, old, self.current_trophies)
+        self._update_milestones(current_brawler, old, self.current_trophies)
         self.match_history[current_brawler][bucket] += 1
         self.match_history["total"][bucket] += 1
 
@@ -181,7 +276,7 @@ class TrophyObserver:
                 new_stats = {
                     "wins": stats["victory"] - self.sent_match_history[brawler]["victory"],
                     "defeats": stats["defeat"] - self.sent_match_history[brawler]["defeat"],
-                    "draws": 0
+                    "draws": stats["draw"] - self.sent_match_history[brawler]["draw"],
                 }
                 if any(new_stats.values()):  # Only include if there are new results
                     data[brawler] = new_stats
@@ -200,7 +295,7 @@ class TrophyObserver:
                         if brawler != "total":
                             self.sent_match_history[brawler]["victory"] = stats["victory"]
                             self.sent_match_history[brawler]["defeat"] = stats["defeat"]
-                            self.sent_match_history[brawler]["draw"] = 0
+                            self.sent_match_history[brawler]["draw"] = stats["draw"]
                 else:
                     print(f"Failed to send results to API. Status code: {response.status_code}")
             except requests.exceptions.RequestException as e:

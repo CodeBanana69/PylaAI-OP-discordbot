@@ -1,6 +1,10 @@
 import asyncio
 import time
 
+from logger_setup import setup_logging_if_enabled
+
+setup_logging_if_enabled()
+
 import window_controller
 from gui.hub import Hub
 from gui.login import login
@@ -11,9 +15,19 @@ from play import Play
 from stage_manager import StageManager
 from state_finder import get_state
 from time_management import TimeManagement
-from utils import load_toml_as_dict, current_wall_model_is_latest, api_base_url
-from utils import get_brawler_list, update_missing_brawlers_info, check_version, async_notify_user, \
-    update_wall_model_classes, get_latest_wall_model_file, get_latest_version, cprint
+from utils import (
+    api_base_url,
+    async_notify_user,
+    check_version,
+    cprint,
+    current_wall_model_is_latest,
+    get_brawler_list,
+    get_latest_version,
+    get_latest_wall_model_file,
+    load_toml_as_dict,
+    update_missing_brawlers_info,
+    update_wall_model_classes,
+)
 from window_controller import WindowController
 
 pyla_version = load_toml_as_dict("./cfg/general_config.toml")['pyla_version']

@@ -12,4 +12,4 @@ idle_pixels_minimum = 10000.0
 wall_detection_confidence = 0.9
 entity_detection_confidence = 0.75
 seconds_to_hold_attack_after_reaching_max = 1.5
-play_again_on_win = "yes"
+play_again_on_win = "no"

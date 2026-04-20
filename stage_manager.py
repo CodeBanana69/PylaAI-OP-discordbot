@@ -182,13 +182,13 @@ class StageManager:
         end_screen_time = time.time()
 
         # If this is a re-entry on the same lingering end-of-match screen
-        # (happened within the last 60s), skip recording and just keep trying
+        # (happened within the last 30s), skip recording and just keep trying
         # to dismiss it.
         current_result = current_state.split("_", 1)[1] if current_state.startswith("end_") else None
         already_recorded = (
             current_result is not None
             and self.last_recorded_result == current_result
-            and time.time() - self.last_recorded_result_time < 60
+            and time.time() - self.last_recorded_result_time < 30
         )
         stats_recorded = already_recorded
         if already_recorded:
@@ -214,6 +214,7 @@ class StageManager:
                     type_to_push = "trophies"
                 value = values[type_to_push]
                 self.brawlers_pick_data[0][type_to_push] = value
+                self.brawlers_pick_data[0]['win_streak'] = self.Trophy_observer.win_streak
                 save_brawler_data(self.brawlers_pick_data)
                 push_current_brawler_till = self.brawlers_pick_data[0]['push_until']
 

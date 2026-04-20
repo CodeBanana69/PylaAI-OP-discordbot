@@ -1,10 +1,10 @@
-state_check = 5
+state_check = 3
 no_detections = 10
 game_start = 0
 idle = 5
-gadget = 0.5
-hypercharge = 0.3
-super = 0.3
-wall_detection = 0.2
+gadget = 0.1
+hypercharge = 0.1
+super = 0.1
+wall_detection = 0.1
 no_detection_proceed = 6.5
 check_if_brawl_stars_crashed = 10

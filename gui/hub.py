@@ -62,6 +62,7 @@ class Hub:
         self.bot_config.setdefault("entity_detection_confidence", 0.6)
         self.bot_config.setdefault("unstuck_movement_delay", 3.0)
         self.bot_config.setdefault("unstuck_movement_hold_time", 1.5)
+        self.bot_config.setdefault("play_again_on_win", "no")
 
 
         # Time thresholds defaults
@@ -79,6 +80,7 @@ class Hub:
         self.general_config.setdefault("long_press_star_drop", "no")
         self.general_config.setdefault("trophies_multiplier", 1.0)
         self.general_config.setdefault("current_emulator", "LDPlayer")
+        self.general_config.setdefault("terminal_logging", "no")
 
         # -----------------------------------------------------------------------------------------
         # Appearance
@@ -731,6 +733,60 @@ class Hub:
             height=S(30)
         )
         long_press_cb.grid(row=row_idx, column=1, sticky="w", padx=S(20), pady=S(10))
+        row_idx += 1
+
+        lbl_play_again = ctk.CTkLabel(container, text="Play Again On Win:", font=("Arial", S(18)))
+        lbl_play_again.grid(row=row_idx, column=0, sticky="e", padx=S(20), pady=S(10))
+        play_again_var = tk.BooleanVar(
+            value=(str(self.bot_config["play_again_on_win"]).lower() in ["yes", "true"])
+        )
+
+        def toggle_play_again():
+            self.bot_config["play_again_on_win"] = "yes" if play_again_var.get() else "no"
+            save_dict_as_toml(self.bot_config, self.bot_config_path)
+
+        play_again_cb = ctk.CTkCheckBox(
+            container,
+            text="",
+            variable=play_again_var,
+            command=toggle_play_again,
+            fg_color="#AA2A2A",
+            hover_color="#BB3A3A",
+            width=S(30),
+            height=S(30)
+        )
+        play_again_cb.grid(row=row_idx, column=1, sticky="w", padx=S(20), pady=S(10))
+        self.attach_tooltip(
+            play_again_cb,
+            "If enabled, the bot presses 'Play Again' after a win instead of returning to the lobby."
+        )
+        row_idx += 1
+
+        lbl_term_log = ctk.CTkLabel(container, text="Terminal Logging:", font=("Arial", S(18)))
+        lbl_term_log.grid(row=row_idx, column=0, sticky="e", padx=S(20), pady=S(10))
+        term_log_var = tk.BooleanVar(
+            value=(str(self.general_config["terminal_logging"]).lower() in ["yes", "true"])
+        )
+
+        def toggle_terminal_logging():
+            self.general_config["terminal_logging"] = "yes" if term_log_var.get() else "no"
+            save_dict_as_toml(self.general_config, self.general_config_path)
+
+        term_log_cb = ctk.CTkCheckBox(
+            container,
+            text="",
+            variable=term_log_var,
+            command=toggle_terminal_logging,
+            fg_color="#AA2A2A",
+            hover_color="#BB3A3A",
+            width=S(30),
+            height=S(30)
+        )
+        term_log_cb.grid(row=row_idx, column=1, sticky="w", padx=S(20), pady=S(10))
+        self.attach_tooltip(
+            term_log_cb,
+            "If enabled, terminal output is saved to logs/pyla_<date>.log files. Takes effect on next launch."
+        )
         row_idx += 1
 
 

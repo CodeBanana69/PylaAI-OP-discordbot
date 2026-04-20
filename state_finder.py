@@ -59,12 +59,12 @@ _current_gamemode = load_toml_as_dict("./cfg/bot_config.toml").get("gamemode", "
 showdown_place_templates = {
     "1st": ["sd1st.png"],
     "2nd": ["sd2nd.png"],
-    "3rd": ["sd3rd.png", "sd3rd_alt.png"],
     "4th": ["sd4th.png"],
+    "3rd": ["sd3rd.png", "sd3rd_alt.png"],
 }
 
 
-SHOWDOWN_PLACE_THRESHOLD = 0.85
+SHOWDOWN_PLACE_THRESHOLD = 0.95
 
 
 def find_game_result(screenshot):

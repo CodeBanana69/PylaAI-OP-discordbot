@@ -278,6 +278,27 @@ class Play(Movement):
         # Narrow range because the fog fully overlays whatever is under it.
         self.fog_hsv_low = (50, 95, 215)
         self.fog_hsv_high = (60, 125, 245)
+        # Fog proximity override: movement flees fog when a real fog front is
+        # within this distance. Attack logic is untouched.
+        self.fog_flee_distance = 120
+        # Confidence filters to avoid reacting to stray pixels:
+        #   - morph opening kernel removes speckle noise
+        #   - only connected fog blobs ≥ this many pixels are trusted
+        #   - need at least this many trusted fog pixels inside the flee
+        #     radius before the override kicks in
+        self.fog_min_blob_pixels = 300
+        self.fog_min_pixels_in_radius = 50
+        # Run the fog-threat check once every N calls to get_showdown_movement.
+        # Between checks the previous decision is reused.
+        self.fog_check_every_n_frames = 3
+        self._fog_check_counter = 0
+        self._fog_threat_cached = None
+        # Per-frame cache of the trusted fog mask, keyed by id(frame).
+        # Cache covers one pipeline run so the mask is not rebuilt when both
+        # detect_fog_threat and detect_fog_direction are called on the same frame.
+        self._fog_mask_cache_frame_id = None
+        self._fog_mask_cache_value = None
+        self._fog_mask_cache_origin = None
 
     def load_brawler_ranges(self, brawlers_info=None):
         if not brawlers_info:
@@ -344,58 +365,112 @@ class Play(Movement):
             # If no movement is possible, return empty string
             return preferred_movement
 
-    def detect_fog_direction(self, frame, player_position):
-        """Find the dominant fog direction relative to the player.
+    def _build_trusted_fog_mask(self, frame, roi_center, roi_radius):
+        """Return (mask, (ox, oy)) or None.
 
-        Builds an HSV mask of the fog color and computes the centroid of fog
-        pixels. Returns the angle FROM the player TO the fog centroid (degrees),
-        or None if there is not enough fog in the frame.
+        Only processes an ROI of side 2*roi_radius+1 around roi_center —
+        we only care about fog that's close to the player.
+        Mask contains only fog pixels that belong to a large, morphologically
+        clean blob — not stray color noise. (ox, oy) is the ROI's top-left
+        offset in frame coordinates so callers can translate back.
+
+        Result is cached per-frame (keyed by id(frame) and ROI tuple).
         """
         if frame is None:
             return None
 
+        cache_key = (id(frame), int(roi_center[0]), int(roi_center[1]), int(roi_radius))
+        if self._fog_mask_cache_frame_id == cache_key:
+            return self._fog_mask_cache_value
+
         import numpy as np
-        hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+        h, w = frame.shape[:2]
+        cx, cy = int(roi_center[0]), int(roi_center[1])
+        x0, y0 = max(0, cx - roi_radius), max(0, cy - roi_radius)
+        x1, y1 = min(w, cx + roi_radius + 1), min(h, cy + roi_radius + 1)
+        if x0 >= x1 or y0 >= y1:
+            self._fog_mask_cache_frame_id = cache_key
+            self._fog_mask_cache_value = None
+            return None
+        region = frame[y0:y1, x0:x1]
+        origin = (x0, y0)
+
+        hsv = cv2.cvtColor(region, cv2.COLOR_RGB2HSV)
         low = np.array(self.fog_hsv_low, dtype=np.uint8)
         high = np.array(self.fog_hsv_high, dtype=np.uint8)
         mask = cv2.inRange(hsv, low, high)
 
-        fog_pixel_count = int(cv2.countNonZero(mask))
-        # Need at least a meaningful chunk of fog on screen to trust the result
-        if fog_pixel_count < 500:
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+        result = None
+        if num_labels > 1:
+            trusted = np.zeros_like(mask)
+            any_kept = False
+            for label in range(1, num_labels):
+                if stats[label, cv2.CC_STAT_AREA] >= self.fog_min_blob_pixels:
+                    trusted[labels == label] = 255
+                    any_kept = True
+            if any_kept and cv2.countNonZero(trusted) > 0:
+                result = (trusted, origin)
+
+        self._fog_mask_cache_frame_id = cache_key
+        self._fog_mask_cache_value = result
+        return result
+
+    def detect_fog_threat(self, frame, player_position):
+        """Check whether a real fog front is within self.fog_flee_distance of
+        the player. Returns the flee angle (away from local fog mass) if so,
+        else None.
+
+        Confidence pipeline:
+          1. HSV threshold → raw mask.
+          2. Morph open + size-filtered connected components → trusted mask.
+          3. Count trusted fog pixels inside a disk of radius fog_flee_distance
+             around the player. If count ≥ fog_min_pixels_in_radius, it's a
+             real incoming front — not a stray artifact.
+        The flee direction is the angle opposite to the centroid of the
+        trusted fog pixels *inside the radius*, so we run away from the
+        closest wall of fog, not from fog on the far side of the map.
+        """
+        r = self.fog_flee_distance
+        built = self._build_trusted_fog_mask(frame, roi_center=player_position, roi_radius=r)
+        if built is None:
+            return None
+        mask, (ox, oy) = built
+
+        import numpy as np
+        px, py = int(player_position[0]), int(player_position[1])
+        ys, xs = np.nonzero(mask)
+        if xs.size == 0:
             return None
 
-        moments = cv2.moments(mask, binaryImage=True)
-        if moments["m00"] == 0:
-            return None
-        fog_cx = moments["m10"] / moments["m00"]
-        fog_cy = moments["m01"] / moments["m00"]
-
-        dx = fog_cx - player_position[0]
-        dy = fog_cy - player_position[1]
-        if math.hypot(dx, dy) < 1:
+        # Translate ROI-local coords to frame coords, then filter to circle
+        dx_all = (xs + ox) - px
+        dy_all = (ys + oy) - py
+        dist_sq = dx_all * dx_all + dy_all * dy_all
+        inside = dist_sq <= r * r
+        count = int(inside.sum())
+        if count < self.fog_min_pixels_in_radius:
             return None
 
-        vlog(f"fog centroid=({int(fog_cx)},{int(fog_cy)}) pixels={fog_pixel_count}")
-        return self.angle_from_direction(dx, dy)
+        # Centroid of the nearby fog mass, then flee opposite direction
+        cx = float(dx_all[inside].mean())
+        cy = float(dy_all[inside].mean())
+        if math.hypot(cx, cy) < 1:
+            return None
+        toward_fog = self.angle_from_direction(cx, cy)
+        flee = self.angle_opposite(toward_fog)
+        vlog(f"fog threat: {count}px within {r}px → flee angle={flee:.1f}° (fog at {toward_fog:.1f}°)")
+        return flee
 
     def showdown_roam(self, player_data, walls):
-        """Roam movement for showdown: move away from the poison fog.
-
-        If fog is visible, head away from its centroid. Otherwise spin in
-        place (rotate the joystick angle each call) to look around without
-        committing to a direction.
+        """Idle roam movement for showdown: rotate the joystick angle each
+        call to look around. Close-fog avoidance is handled by the uniform
+        fog-threat override in get_showdown_movement.
         """
-        player_position = self.get_player_pos(player_data)
-
-        fog_angle = self.detect_fog_direction(self.current_frame, player_position)
-        if fog_angle is not None:
-            desired_angle = self.angle_opposite(fog_angle)
-            vlog(f"roam: fog detected → flee angle={desired_angle:.1f}° (fog at {fog_angle:.1f}°)")
-            return self.find_best_angle(player_position, desired_angle, walls)
-
-        # Nothing to chase, nothing to flee — spin in place
-        self._roam_spin_angle = (getattr(self, "_roam_spin_angle", 0.0) + 30.0) % 360
+        self._roam_spin_angle = (getattr(self, "_roam_spin_angle", 0.0) + 15.0) % 360
         vlog(f"roam: idle spin → angle={self._roam_spin_angle:.1f}°")
         return self._roam_spin_angle
 
@@ -463,38 +538,64 @@ class Play(Movement):
         safe_range, attack_range, super_range = self.get_brawler_range(brawler)
         player_pos = self.get_player_pos(player_data)
 
+        # Fog override is applied uniformly at the end so it works for all
+        # three movement sources (chase/retreat enemy, follow teammate, roam).
+        # Throttled: only actually run the detector once every N calls and
+        # reuse the last decision in between — the fog advances slowly enough
+        # that a few frames of staleness don't matter.
+        self._fog_check_counter += 1
+        if self._fog_check_counter >= self.fog_check_every_n_frames:
+            self._fog_threat_cached = self.detect_fog_threat(self.current_frame, player_pos)
+            self._fog_check_counter = 0
+        fog_flee_angle = self._fog_threat_cached
+
+        enemy_coords = None
+        enemy_distance = None
+
         # --- No enemy in sight: follow teammate or roam ---
         if not self.is_there_enemy(enemy_data):
             if teammate_data:
                 vlog(f"no enemy → follow teammate ({len(teammate_data)} visible)")
-                return self.showdown_follow_teammate(player_data, teammate_data, walls)
-            vlog("no enemy, no teammate → roam")
-            return self.showdown_roam(player_data, walls)
-
-        enemy_coords, enemy_distance = self.find_closest_enemy(enemy_data, player_pos, walls, "attack")
-        if enemy_coords is None:
-            if teammate_data:
-                vlog("enemy detected but unreachable → follow teammate")
-                return self.showdown_follow_teammate(player_data, teammate_data, walls)
-            vlog("enemy detected but unreachable, no teammate → roam")
-            return self.showdown_roam(player_data, walls)
-
-        # --- Compute exact angle toward/away from enemy, then wall-avoid ---
-        direction_x = enemy_coords[0] - player_pos[0]
-        direction_y = enemy_coords[1] - player_pos[1]
-        toward_angle = self.angle_from_direction(direction_x, direction_y)
-
-        if enemy_distance > safe_range:
-            desired = toward_angle
-            vlog(f"enemy detected → approach desired={desired:.1f}° (dist={int(enemy_distance)}px, safe={safe_range}px)")
+                angle = self.showdown_follow_teammate(player_data, teammate_data, walls)
+            else:
+                vlog("no enemy, no teammate → roam")
+                angle = self.showdown_roam(player_data, walls)
         else:
-            desired = self.angle_opposite(toward_angle)
-            vlog(f"enemy too close → retreat desired={desired:.1f}° (dist={int(enemy_distance)}px, safe={safe_range}px)")
+            enemy_coords, enemy_distance = self.find_closest_enemy(enemy_data, player_pos, walls, "attack")
+            if enemy_coords is None:
+                if teammate_data:
+                    vlog("enemy detected but unreachable → follow teammate")
+                    angle = self.showdown_follow_teammate(player_data, teammate_data, walls)
+                else:
+                    vlog("enemy detected but unreachable, no teammate → roam")
+                    angle = self.showdown_roam(player_data, walls)
+            else:
+                # --- Compute exact angle toward/away from enemy, then wall-avoid ---
+                direction_x = enemy_coords[0] - player_pos[0]
+                direction_y = enemy_coords[1] - player_pos[1]
+                toward_angle = self.angle_from_direction(direction_x, direction_y)
 
-        angle = self.find_best_angle(player_pos, desired, walls)
-        vlog(f"showdown: movement angle={angle:.1f}° (desired={desired:.1f}°)")
+                if enemy_distance > safe_range:
+                    desired = toward_angle
+                    vlog(f"enemy detected → approach desired={desired:.1f}° (dist={int(enemy_distance)}px, safe={safe_range}px)")
+                else:
+                    desired = self.angle_opposite(toward_angle)
+                    vlog(f"enemy too close → retreat desired={desired:.1f}° (dist={int(enemy_distance)}px, safe={safe_range}px)")
 
-        # --- Skills ---
+                angle = self.find_best_angle(player_pos, desired, walls)
+                vlog(f"showdown: movement angle={angle:.1f}° (desired={desired:.1f}°)")
+
+        # --- Fog proximity override ---
+        # If trusted fog is close, replace movement with a flee angle. Attack
+        # block below still fires independently based on enemy_distance.
+        if fog_flee_angle is not None:
+            angle = self.find_best_angle(player_pos, fog_flee_angle, walls)
+            vlog(f"showdown: fog override → angle={angle:.1f}°")
+
+        # --- Skills (only when an attackable enemy was found) ---
+        if enemy_coords is None:
+            return angle
+
         if self.is_super_ready and self.time_since_holding_attack is None:
             super_type = brawler_info['super_type']
             enemy_hittable = self.is_enemy_hittable(player_pos, enemy_coords, walls, "super")

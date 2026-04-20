@@ -1,7 +1,7 @@
 {
     "shelly": {
         "safe_range": 301.0,
-        "attack_range": 490.0,
+        "attack_range": 430.0,
         "super_type": "damage",
         "super_range": 490,
         "ignore_walls_for_attacks": false,
