@@ -20,8 +20,8 @@ This repository is intended for devs and it's recommended for others to use the 
 
 How to run : 
 - Install python and git(tested with python 3.11.9)
-- open a cmd and type `git clone https://github.com/PylaAI/PylaAI.git`
-- run `cd PylaAI`
+- open a cmd and type `git clone https://github.com/MrMuff1nn/PylaAI-OP.git`
+- run `cd PylaAI-OP`
 - run `python setup.py install`
 - and then run `python main.py`
 - enjoy !
