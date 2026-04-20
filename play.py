@@ -47,17 +47,35 @@ class Movement:
         self.is_hypercharge_ready = False
         self.window_controller = window_controller
         self.TILE_SIZE = 60
-        # Separate unstuck state for analog (angle-based) movement, so the
-        # existing string-based unstuck for other game modes is untouched.
-        self.fix_angle_state = {
-            "delay_to_trigger": bot_config["unstuck_movement_delay"],
-            "duration": bot_config["unstuck_movement_hold_time"],
-            "toggled": False,
-            "started_at": time.time(),
-            "last_angle": None,
-            "last_angle_change": time.time(),
-            "fixed_angle": None,
+        # Wall-based stuck detector: samples wall bboxes on an interval, ignores
+        # walls near the player (they flicker as he overlaps them), and flags
+        # "stuck" when walls don't move for wall_stuck_timeout seconds while the
+        # bot is trying to move. Triggers a semicircle escape maneuver.
+        self.wall_stuck_enabled = str(bot_config.get("wall_stuck_enabled", "yes")).lower() in ("yes", "true", "1")
+        general_config = load_toml_as_dict("cfg/general_config.toml")
+        self.wall_stuck_debug = str(general_config.get("wall_stuck_debug", "no")).lower() in ("yes", "true", "1")
+        self.wall_stuck_ignore_radius = float(bot_config.get("wall_stuck_ignore_radius", 150))
+        self.wall_stuck_sample_interval = float(bot_config.get("wall_stuck_sample_interval", 0.2))
+        self.wall_stuck_shift_threshold = float(bot_config.get("wall_stuck_shift_threshold", 3.0))
+        self.wall_stuck_timeout = float(bot_config.get("wall_stuck_timeout", 3.0))
+        self.wall_stuck_min_walls = int(bot_config.get("wall_stuck_min_walls", 3))
+        self.wall_stuck_state = {
+            "last_sample_time": 0.0,
+            "last_wall_centers": None,   # np.ndarray (N, 2) of filtered wall centers
+            "stationary_since": None,    # when walls first went stationary; None = not stationary
         }
+
+        # Semicircle escape state. Alternates side globally between triggers.
+        self.escape_retreat_duration = float(bot_config.get("escape_retreat_duration", 0.4))
+        self.escape_arc_duration = float(bot_config.get("escape_arc_duration", 1.2))
+        self.escape_arc_degrees = float(bot_config.get("escape_arc_degrees", 135.0))
+        self.escape_state = {
+            "phase": None,            # "retreat" | "arc" | None
+            "started_at": 0.0,
+            "retreat_angle": 0.0,
+            "arc_side": 1,            # +1 = CCW, -1 = CW; flipped each trigger
+        }
+        self._next_arc_side = 1
         
     @staticmethod
     def get_enemy_pos(enemy):
@@ -169,55 +187,141 @@ class Movement:
 
         return movement
 
-    def unstuck_angle_if_needed(self, angle: float, current_time: float = None) -> float:
-        """Unstuck routine for analog joystick movement.
-
-        Works by tracking how long the requested angle has stayed roughly the
-        same (±20°). If it has been locked for longer than delay_to_trigger,
-        we assume the bot is pressed against something the wall detector
-        missed and we force a ~135° deflection for `duration` seconds to
-        wiggle free.
+    def _wslog(self, *args):
+        """Dedicated logger for wall-stuck / escape — independent of vlog/visual_debug
+        so the new unstuck machinery can be traced without dumping the full debug stream.
         """
-        if current_time is None:
-            current_time = time.time()
+        if self.wall_stuck_debug:
+            print("[WS]", *args)
 
-        state = self.fix_angle_state
+    def _wall_centers_filtered(self, walls, player_pos):
+        """Return (N, 2) float array of wall centers, excluding walls whose
+        center lies within wall_stuck_ignore_radius of the player (those
+        flicker as the player overlaps them).
+        """
+        import numpy as np
+        if not walls:
+            return np.empty((0, 2), dtype=np.float32)
+        centers = []
+        px, py = player_pos
+        r2 = self.wall_stuck_ignore_radius * self.wall_stuck_ignore_radius
+        for box in walls:
+            x1, y1, x2, y2 = box[0], box[1], box[2], box[3]
+            cx = (x1 + x2) * 0.5
+            cy = (y1 + y2) * 0.5
+            dx, dy = cx - px, cy - py
+            if dx * dx + dy * dy >= r2:
+                centers.append((cx, cy))
+        return np.asarray(centers, dtype=np.float32) if centers else np.empty((0, 2), dtype=np.float32)
 
-        # If an unstuck deflection is already active, keep using it until it expires
-        if state['toggled']:
-            if current_time - state['started_at'] > state['duration']:
-                state['toggled'] = False
-                state['last_angle'] = angle
-                state['last_angle_change'] = current_time
-                vlog("unstuck(angle): finished")
-                return angle
-            vlog(f"unstuck(angle): active → {state['fixed_angle']:.1f}°")
-            return state['fixed_angle']
+    def _avg_wall_shift(self, prev_centers, curr_centers):
+        """Greedy nearest-neighbor match between two sets of wall centers.
+        Returns mean pairwise distance (px). Returns None if either set is too
+        small (can't form a reliable metric).
+        """
+        import numpy as np
+        if prev_centers is None or len(prev_centers) < self.wall_stuck_min_walls:
+            return None
+        if len(curr_centers) < self.wall_stuck_min_walls:
+            return None
+        # For each prev center, find nearest curr center (O(N*M), fine for N~20)
+        diffs = prev_centers[:, None, :] - curr_centers[None, :, :]
+        d2 = (diffs * diffs).sum(axis=2)
+        nearest = np.sqrt(d2.min(axis=1))
+        return float(nearest.mean())
 
-        # Track how long the commanded angle has been (roughly) unchanged
-        if state['last_angle'] is None:
-            state['last_angle'] = angle
-            state['last_angle_change'] = current_time
-            return angle
+    def detect_wall_stuck(self, walls, player_pos, is_trying_to_move, current_time):
+        """Wall-based stuck detector. Returns True if the walls around the
+        player have been stationary longer than wall_stuck_timeout while the
+        bot was issuing movement commands — meaning the bot is pressed against
+        something and not actually moving.
+        """
+        if not self.wall_stuck_enabled or player_pos is None:
+            return False
+        state = self.wall_stuck_state
+        if current_time - state["last_sample_time"] < self.wall_stuck_sample_interval:
+            # Between samples: just honor the latest stationary flag
+            if state["stationary_since"] is None or not is_trying_to_move:
+                return False
+            return (current_time - state["stationary_since"]) >= self.wall_stuck_timeout
 
-        diff = abs((angle - state['last_angle'] + 180) % 360 - 180)
-        if diff > 20:
-            state['last_angle'] = angle
-            state['last_angle_change'] = current_time
-            return angle
+        curr_centers = self._wall_centers_filtered(walls, player_pos)
+        shift = self._avg_wall_shift(state["last_wall_centers"], curr_centers)
+        state["last_wall_centers"] = curr_centers
+        state["last_sample_time"] = current_time
 
-        # Angle has stayed similar — check if it has been long enough to trigger
-        if current_time - state['last_angle_change'] > state['delay_to_trigger']:
-            # Deflect by ±135° (random side) to wiggle around the obstacle
-            offset = random.choice((135.0, -135.0))
-            deflected = (angle + offset) % 360
-            state['fixed_angle'] = deflected
-            state['toggled'] = True
-            state['started_at'] = current_time
-            vlog(f"unstuck(angle) triggered: {angle:.1f}° → {deflected:.1f}°")
-            return deflected
+        if shift is None:
+            # Not enough walls to judge — treat as "unknown", don't advance timer
+            state["stationary_since"] = None
+            return False
 
-        return angle
+        if shift < self.wall_stuck_shift_threshold:
+            if state["stationary_since"] is None:
+                state["stationary_since"] = current_time
+            self._wslog(f"walls shift={shift:.2f}px, stationary for "
+                        f"{current_time - state['stationary_since']:.2f}s "
+                        f"(trying_to_move={is_trying_to_move})")
+        else:
+            if state["stationary_since"] is not None:
+                self._wslog(f"walls moved again: shift={shift:.2f}px, resetting timer")
+            state["stationary_since"] = None
+
+        if state["stationary_since"] is None or not is_trying_to_move:
+            return False
+        return (current_time - state["stationary_since"]) >= self.wall_stuck_timeout
+
+    def _reset_wall_stuck_state(self, current_time):
+        """Clear the wall-stuck timer. Call after triggering an escape to
+        avoid retriggering during/just after the maneuver.
+        """
+        self.wall_stuck_state["stationary_since"] = None
+        self.wall_stuck_state["last_wall_centers"] = None
+        self.wall_stuck_state["last_sample_time"] = current_time
+
+    def start_semicircle_escape(self, angle, current_time):
+        """Begin the retreat+arc escape maneuver. arc_side alternates globally
+        between triggers.
+        """
+        side = self._next_arc_side
+        self._next_arc_side = -side
+        self.escape_state["phase"] = "retreat"
+        self.escape_state["started_at"] = current_time
+        self.escape_state["retreat_angle"] = self.angle_opposite(angle)
+        self.escape_state["arc_side"] = side
+        self._wslog(f"semicircle escape START: angle={angle:.1f}° "
+                    f"retreat={self.escape_state['retreat_angle']:.1f}° "
+                    f"side={'CCW' if side > 0 else 'CW'}")
+
+    def semicircle_escape_step(self, current_time):
+        """Return the current commanded angle for the active escape maneuver,
+        or None if no maneuver is active / it just finished.
+        """
+        state = self.escape_state
+        phase = state["phase"]
+        if phase is None:
+            return None
+        elapsed = current_time - state["started_at"]
+
+        if phase == "retreat":
+            if elapsed < self.escape_retreat_duration:
+                return state["retreat_angle"]
+            # Transition: arc starts from retreat angle and sweeps arc_degrees
+            state["phase"] = "arc"
+            state["started_at"] = current_time
+            self._wslog("semicircle escape: retreat done, starting arc")
+            elapsed = 0.0
+            phase = "arc"
+
+        if phase == "arc":
+            if elapsed >= self.escape_arc_duration:
+                state["phase"] = None
+                self._wslog("semicircle escape: finished")
+                return None
+            t = elapsed / self.escape_arc_duration  # 0..1
+            sweep = self.escape_arc_degrees * t * state["arc_side"]
+            return (state["retreat_angle"] + sweep) % 360
+
+        return None
 
 
 class Play(Movement):
@@ -815,7 +919,19 @@ class Play(Movement):
         current_time = time.time()
         if current_time - self.time_since_movement > self.minimum_movement_delay:
             if isinstance(movement, float):
-                movement = self.unstuck_angle_if_needed(movement, current_time)
+                # 1. If a semicircle escape is already running, just advance it.
+                escape_angle = self.semicircle_escape_step(current_time)
+                if escape_angle is not None:
+                    movement = escape_angle
+                else:
+                    # 2. Wall-based stuck detector triggers the semicircle escape.
+                    player_pos = self.get_player_pos(data['player'][0]) if data.get('player') else None
+                    walls = data.get('wall') or []
+                    is_trying = isinstance(movement, float)
+                    if self.detect_wall_stuck(walls, player_pos, is_trying, current_time):
+                        self.start_semicircle_escape(movement, current_time)
+                        self._reset_wall_stuck_state(current_time)
+                        movement = self.semicircle_escape_step(current_time) or movement
             else:
                 movement = self.unstuck_movement_if_needed(movement, current_time)
             self.do_movement(movement)

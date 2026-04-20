@@ -602,7 +602,7 @@ class Hub:
     def _add_version_label(self, frame):
         version_label = ctk.CTkLabel(
             frame,
-            text="SD-OP v1.1",
+            text="SD-OP v1.1.5",
             font=("Arial", S(14), "bold"),
             text_color="#888888"
         )

@@ -4,11 +4,16 @@ victory = 83
 draw = 45
 
 [total]
-defeat = 1
-victory = 1
-draw = 1
+defeat = 0
+victory = 5
+draw = 2
 
 [squeak]
-defeat = 14
-victory = 21
-draw = 14
+defeat = 18
+victory = 32
+draw = 22
+
+[mortis]
+defeat = 0
+victory = 5
+draw = 3
