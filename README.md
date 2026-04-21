@@ -24,6 +24,7 @@ How to run :
 - run `cd PylaAI-OP`
 - run `python setup.py install`
 - and then run `python main.py`
+- Make sure your emulator is set to 1920x1080 (280dpi) in its settings
 - enjoy !
 
 Notes :
