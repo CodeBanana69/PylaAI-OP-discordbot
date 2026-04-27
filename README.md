@@ -29,15 +29,15 @@ How to run :
 
 - Additional Discord Integration
 - 
-Configure your Discord Bot:
+-Configure your Discord Bot:
 
-    Go to the Discord Developer Portal and create a Bot.
+    -Go to the Discord Developer Portal and create a Bot.
 
-    Turn on Message Content Intent in the Bot tab.
+    -Turn on Message Content Intent in the Bot tab.
 
-    Invite the bot to your private Discord server.
+    -Invite the bot to your private Discord server.
 
-    Get your Discord User ID `(Right-click your profile in Discord -> Copy User ID).`
+    -Get your Discord User ID `(Right-click your profile in Discord -> Copy User ID).`
 
 Update general_config.toml:
 Open cfg/general_config.toml and add your Discord credentials at the bottom:
