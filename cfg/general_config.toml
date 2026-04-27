@@ -14,3 +14,6 @@ current_emulator = "MuMu"
 emulator_port = 16384
 api_base_url = "default"
 brawl_stars_package = "com.supercell.brawlstars"
+discord_token = "YOUR_BOT_TOKEN_HERE"
+discord_id = "YOUR_DISCORD_USER_ID"
+personal_webhook = ""
