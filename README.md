@@ -38,14 +38,15 @@ Configure your Discord Bot:
   Get your Discord User ID `(Right-click your profile in Discord -> Copy User ID).`
 
 Update general_config.toml:
-Open cfg/general_config.toml and add your Discord credentials at the bottom:
+
+- Open cfg/general_config.toml and add your Discord credentials at the bottom:
 code Toml
 
-discord_token = `"YOUR_DISCORD_BOT_TOKEN_HERE"`
+- discord_token = `"YOUR_DISCORD_BOT_TOKEN_HERE"`
 
-discord_id = `"YOUR_DISCORD_USER_ID_HERE"`
+- discord_id = `"YOUR_DISCORD_USER_ID_HERE"`
 
-personal_webhook = `"YOUR_DISCORD_WEBHOOK_URL_HERE"` # Optional: For goal completion alerts
+- personal_webhook = `"YOUR_DISCORD_WEBHOOK_URL_HERE"` # Optional: For goal completion alerts
 
 Notes :
 - This is the "localhost" version which means everything API related isn't enabled (login, online stats tracking, auto brawler list updating, auto icon updating, auto wall model updating). 
