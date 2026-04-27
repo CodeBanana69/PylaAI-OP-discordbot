@@ -37,7 +37,20 @@ from window_controller import WindowController
 
 pyla_version = load_toml_as_dict("./cfg/general_config.toml")['pyla_version']
 
-def pyla_main(data):
+def pyla_main(data):'
+    state_bridge = SharedState()
+    config = load_toml_as_dict("cfg/general_config.toml")
+    discord_token = config.get("discord_token", "")
+    
+    if discord_token:
+        bot_thread = threading.Thread(
+            target=run_discord_bot, 
+            args=(discord_token, state_bridge), 
+            daemon=True
+        )
+        bot_thread.start()
+        print("Interactive Discord bot thread started.")
+
     class Main:
 
         def __init__(self):
