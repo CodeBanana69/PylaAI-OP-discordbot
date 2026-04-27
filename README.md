@@ -31,6 +31,7 @@ Configure your Discord Bot:
 
   - Go to the Discord Developer Portal and create a Bot.
   - Turn on Message Content Intent in the Bot tab.
+  - Then, without leaving bot tab, Click reset token making sure to copy token
   - Go to OAuth2 → URL Generator → select scope bot → permissions: Send Messages, Attach Files, Read Message History
   - Invite the bot to your private Discord server.
   - Get your Discord User ID `(Right-click your profile in Discord -> Copy User ID).`
