@@ -29,13 +29,10 @@ How to run :
 
 Configure your Discord Bot:
 
-  Go to the Discord Developer Portal and create a Bot.
-
-  Turn on Message Content Intent in the Bot tab.
-
-  Invite the bot to your private Discord server.
-
-  Get your Discord User ID `(Right-click your profile in Discord -> Copy User ID).`
+  - Go to the Discord Developer Portal and create a Bot.
+  - Turn on Message Content Intent in the Bot tab.
+  - Invite the bot to your private Discord server.
+  - Get your Discord User ID `(Right-click your profile in Discord -> Copy User ID).`
 
 Update general_config.toml:
 
@@ -43,9 +40,7 @@ Update general_config.toml:
 code Toml
 
 - discord_token = `"YOUR_DISCORD_BOT_TOKEN_HERE"`
-
 - discord_id = `"YOUR_DISCORD_USER_ID_HERE"`
-
 - personal_webhook = `"YOUR_DISCORD_WEBHOOK_URL_HERE"` # Optional: For goal completion alerts
 
 Notes :
