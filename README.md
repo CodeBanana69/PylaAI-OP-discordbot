@@ -28,6 +28,7 @@ How to run :
 - enjoy !
 
 - Additional Discord Integration
+- 
 Configure your Discord Bot:
 
     Go to the Discord Developer Portal and create a Bot.
@@ -36,15 +37,15 @@ Configure your Discord Bot:
 
     Invite the bot to your private Discord server.
 
-    Get your Discord User ID (Right-click your profile in Discord -> Copy User ID).
+    Get your Discord User ID `(Right-click your profile in Discord -> Copy User ID).`
 
 Update general_config.toml:
 Open cfg/general_config.toml and add your Discord credentials at the bottom:
 code Toml
 
-discord_token = "YOUR_DISCORD_BOT_TOKEN_HERE"
-discord_id = "YOUR_DISCORD_USER_ID_HERE"
-personal_webhook = "YOUR_DISCORD_WEBHOOK_URL_HERE" # Optional: For goal completion alerts
+discord_token = `"YOUR_DISCORD_BOT_TOKEN_HERE"`
+discord_id = `"YOUR_DISCORD_USER_ID_HERE"`
+personal_webhook = `"YOUR_DISCORD_WEBHOOK_URL_HERE"` # Optional: For goal completion alerts
 
 Notes :
 - This is the "localhost" version which means everything API related isn't enabled (login, online stats tracking, auto brawler list updating, auto icon updating, auto wall model updating). 
@@ -56,6 +57,7 @@ You can make it "online" by changing the base api url in utils.py and recoding t
 Devs : 
 - Iyordanov
 - AngelFire
+
 
 # Run tests
 Run `python -m unittest discover` to check if your changes have made any regressions. 
