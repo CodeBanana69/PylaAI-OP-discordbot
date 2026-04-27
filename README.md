@@ -53,6 +53,7 @@ You can make it "online" by changing the base api url in utils.py and recoding t
 Devs : 
 - Iyordanov
 - AngelFire
+- Discord Integration Author @myddxyz
 
 
 # Run tests
