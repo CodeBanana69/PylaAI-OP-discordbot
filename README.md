@@ -1,84 +1,67 @@
-🤖 PylaAI — Ultimate Showdown Fork (with Discord Integration)
+# PylaAI — Showdown Fork
 
-This repository is a highly customized, advanced fork of PylaAI designed specifically to dominate in Showdown modes. It combines top-tier survival logic (poison fog detection, analog movement) with a fully interactive Discord Bot that allows you to monitor, pause, and control your bot remotely from your phone or PC.
-✨ Key Features
-🏆 Showdown Optimized Gameplay
+This fork focuses on **Showdown** (trio). Other game modes still run off the upstream logic, but development effort and tuning here go into making Showdown play well end-to-end.
 
-    Advanced Movement: Analog movement mapping instead of standard 8-way directional clicks for smoother dodging.
+What the bot does in Showdown:
 
-    Survival Logic: Intelligent trio logic and poison fog evasion to maximize placements.
+- **Analog joystick movement.** Brawlers are moved by a continuous angle, not WASD taps, so pathing and dodging are smoother than in the stock client-agnostic modes.
+- **Follows teammates in trio** when there's no enemy to chase, with hysteresis so it doesn't ping-pong between two nearby teammates.
+- **Passive roam** when alone and safe — slow rotation of standing still.
+- **Poison fog avoidance.** Detects the fog and when a trusted fog mass enters the flee radius around the player, overrides movement to run the opposite way.
+- **Wall-based unstuck detector + semicircle escape.** If surrounding walls stop moving while the bot is commanding movement, it's pressed against something — the bot retreats from the obstacle and then sweeps a semicircular arc around it. The arc side alternates between triggers.
+- **Place-based trophy tracking.** Recognizes 1st/2nd/3rd/4th-place end screens and updates the trophy count accordingly.
 
-    Trophy Tracking: Automated stats tracking for Showdown placements (Win = 1st/2nd, Loss = 3rd/4th).
+---
 
-📱 Interactive Discord Control Panel
+PylaAI is currently the best external Brawl Stars bot.
+This repository is intended for devs and it's recommended for others to use the official version from the discord.
 
-    Remote Control: Type !panel in your Discord server to bring up a control UI.
+**Warning :** This is the source-code, which is meant for developpers or people that know how to install python libraries and run python scripts --> The official build is linked in the discord, which is the source-code converted into an exe so you don't need additional knowledge to run the bot. (You will have to go through a linkvertise link)
 
-    Live Screenshots: Request a live frame of your emulator directly to Discord.
+How to run : 
+- Install python and git(tested with python 3.11.9)
+- open a cmd and type `git clone https://github.com/MrMuff1nn/PylaAI-OP.git`
+- run `cd PylaAI-OP`
+- run `python setup.py install`
+- and then run `python main.py`
+- Make sure your emulator is set to 1920x1080 (280dpi) in its settings
+- enjoy !
 
-    Pause & Stop: Remotely freeze the bot (Pause) or kill the process entirely (Stop) if it gets stuck.
+- Additional Discord Integration
+Configure your Discord Bot:
 
-    Webhook Notifications: Get automatic notifications and screenshots when the bot finishes its brawler goals.
+    Go to the Discord Developer Portal and create a Bot.
 
-⚙️ Installation & Setup
+    Turn on Message Content Intent in the Bot tab.
 
-    Clone the repository:
-    code Bash
+    Invite the bot to your private Discord server.
 
-    git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-    cd YOUR_REPO_NAME
+    Get your Discord User ID (Right-click your profile in Discord -> Copy User ID).
 
-    Install Dependencies:
-    Make sure you have Python installed, then install the required packages. (Note: discord.py is required for the remote control panel!)
-    code Bash
+Update general_config.toml:
+Open cfg/general_config.toml and add your Discord credentials at the bottom:
+code Toml
 
-    pip install -r requirements.txt
-    pip install discord.py
+discord_token = "YOUR_DISCORD_BOT_TOKEN_HERE"
+discord_id = "YOUR_DISCORD_USER_ID_HERE"
+personal_webhook = "YOUR_DISCORD_WEBHOOK_URL_HERE" # Optional: For goal completion alerts
 
-    Configure your Discord Bot:
+Notes :
+- This is the "localhost" version which means everything API related isn't enabled (login, online stats tracking, auto brawler list updating, auto icon updating, auto wall model updating). 
+You can make it "online" by changing the base api url in utils.py and recoding the app to answer to the different endpoints. Site's code might become opensource but currently isn't.
+- You can get the .pt version of the ai vision model at https://github.com/AngelFireLA/BrawlStarsBotMaking
+- This repository won't contain early access features before they are released to the public.
+- Please respect the "no selling" license as respect for our work.
 
-        Go to the Discord Developer Portal and create a Bot.
+Devs : 
+- Iyordanov
+- AngelFire
 
-        Turn on Message Content Intent in the Bot tab.
+# Run tests
+Run `python -m unittest discover` to check if your changes have made any regressions. 
 
-        Invite the bot to your private Discord server.
+# If you want to contribute, don't hesitate to create an Issue, a Pull Request, or/and make a ticket on the Pyla discord server at :
+https://discord.gg/xUusk3fw4A
 
-        Get your Discord User ID (Right-click your profile in Discord -> Copy User ID).
-
-    Update general_config.toml:
-    Open cfg/general_config.toml and add your Discord credentials at the bottom:
-    code Toml
-
-    discord_token = "YOUR_DISCORD_BOT_TOKEN_HERE"
-    discord_id = "YOUR_DISCORD_USER_ID_HERE"
-    personal_webhook = "YOUR_DISCORD_WEBHOOK_URL_HERE" # Optional: For goal completion alerts
-
-🚀 How to Run
-
-    Open your BlueStacks / Emulator and launch Brawl Stars.
-
-    Run the main script:
-    code Bash
-
-    python main.py
-
-    The GUI will appear. Select your brawler and click Start.
-
-    Discord Usage: Go to your Discord server and type !panel to summon the control panel. You can now minimize the terminal and monitor everything from Discord!
-
-🙏 Credits & Acknowledgements
-
-This fork wouldn't be possible without the incredible work of the open-source community. Huge thanks to:
-
-    AngelFireLA & The PylaAI Team
-    The Pioneers. Creators of the original PylaAI base. All core computer vision logic, ONNX models, window controllers, and base GUI structure belong to them.
-
-    MrMuff1nn (PylaAI-OP)
-    The Showdown Master. Developer of the advanced Showdown logic. Their fork introduced the analog movement, fog detection, and trio logic that makes this bot actually survive and win in Solo/Duo Showdown.
-
-    myddxyz (BrawlIndustry)
-    The Remote Controller. Creator of the interactive Discord integration. The asynchronous bot thread, shared state bridging, and !panel interactive UI were ported directly from their multi-instance fork.
-
-⚠️ Disclaimer
-
-This software is for educational purposes only. Using macros, automation, or bots violates the Supercell Terms of Service. Use this at your own risk; the creators and contributors of this repository are not responsible for any account bans or penalties.
+Don't know what to do ? Check the To-Fix and Idea lists :
+https://trello.com/b/SAz9J6AA/public-pyla-trello
