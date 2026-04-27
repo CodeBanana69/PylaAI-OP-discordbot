@@ -135,8 +135,23 @@ def pyla_main(data):'
             s_time = time.time()
             c = 0
             while True:
+                # ---- ADD discord CHECKS HERe
+                if state_bridge.stop_requested():
+                    print("Bot stopped remotely via Discord.")
+                    break
+                    
+                if state_bridge.is_paused():
+                    time.sleep(1)
+                    continue
+                    
+                if state_bridge.screenshot_requested():
+                    # Take screenshot using the bot's existing controller
+                    current_frame = self.window_controller.screenshot()
+                    state_bridge.save_screenshot(current_frame)
+
                 if self.max_ips:
                     frame_start = time.perf_counter()
+                    
                 if self.run_for_minutes > 0 and not self.in_cooldown:
                     elapsed_time = (time.time() - self.start_time) / 60
                     if elapsed_time >= self.run_for_minutes:
